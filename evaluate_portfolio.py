@@ -59,10 +59,12 @@ data = {}
 count = 0
 for name in s_and_p:
     tmp = getStockDataVec(name)
-    if len(tmp) == days and count < 50: #full length
+
+    if len(tmp) == days:
         count+=1
-        scale = 900/tmp[0]
-        data[name] = np.ndarray.tolist(np.multiply(scale,tmp)) #need to fix to get right dynamic scaler
+        if count > 100 and count < 140: #full length
+            scale = 900/tmp[0]
+            data[name] = np.ndarray.tolist(np.multiply(scale,tmp)) #need to fix to get right dynamic scaler
 
 print("loading model ...")
 stock_name, model_name = sys.argv[1], sys.argv[2]
@@ -72,6 +74,10 @@ window_size = model.layers[0].input.shape.as_list()[1]
 print("loading agent ...")
 agent = {}
 total_profit = 0
+total_profit_array = np.zeros((1259))
+buy_and_hold_array = np.zeros((1259))
+#buy_and_hold = 0
+#buy_and_hold_array = np.zeros((1259))
 stocks_held = 0
 for xxx, name in enumerate(data):
     print(name)
@@ -81,8 +87,9 @@ for xxx, name in enumerate(data):
 print("starting model")
 for day in range(days): #looping through days
     print("Day:", day, "Money:", avaliable_money, "TP:", total_profit, "SH:", stocks_held)
+    buy_and_hold = 0
     for xxx, name in enumerate(data): #looping through each stock
-
+        buy_and_hold += (initial_avaliable_money/len(data)) * (data[name][day]/data[name][0])
         state = getState(data[name], day, window_size + 1)
         action = agent[name].act(state)
         #next_state = getState(data[name], day, window_size + 1)
@@ -106,9 +113,13 @@ for day in range(days): #looping through days
         done = True if day == days - 1 else False
         #agent[name].memory.append((state, action, reward, next_state, done))
         #state = next_state
+    total_profit_array[day] = total_profit + initial_avaliable_money
+    buy_and_hold_array[day] = buy_and_hold
 
-#total assets
+#sell off
+buy_and_hold = 0
 for xxx, name in enumerate(data):
+    buy_and_hold += (initial_avaliable_money/len(data)) * (data[name][days-1]/data[name][0])
     for n in range(len(agent[name].inventory)):
         bought_price = agent[name].inventory.pop(0)
         reward = max(data[name][days-1] - bought_price, 0)
@@ -116,4 +127,11 @@ for xxx, name in enumerate(data):
         avaliable_money += data[name][days-1]
         print ("Sell: " + formatPrice(data[name][days-1]) + " | Profit: " + formatPrice(data[name][day] - bought_price))
 
-print("Money:", avaliable_money, "TP:", total_profit, "Gain:", avaliable_money/initial_avaliable_money)
+#calculate buy and buy_and_hold
+
+
+print("Money:", avaliable_money, "TP:", total_profit, "Gain:", avaliable_money/initial_avaliable_money, "BH:", buy_and_hold/initial_avaliable_money)
+
+plt.plot(total_profit_array)
+plt.plot(buy_and_hold_array)
+plt.show()
